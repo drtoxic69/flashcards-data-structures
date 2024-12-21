@@ -1,5 +1,7 @@
 import random
+import json
 from colorama import init, Fore, Style
+
 init()
 
 def create_box(question, answer, topic, index):
@@ -10,13 +12,16 @@ def create_box(question, answer, topic, index):
         len(f"Topic: {topic}")
     ) + 4  # Add some padding
 
+    def format_line(label, content, color):
+        return f"{Fore.CYAN}║{Fore.WHITE} {label}:{color} {content}{' ' * (content_width - len(f'{label}: {content}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}"
+
     box = [
         f"{Fore.CYAN}╔{'═' * content_width}╗{Style.RESET_ALL}",
         f"{Fore.CYAN}║{Fore.WHITE}{f' #{index}'.center(content_width)}{Fore.CYAN}║{Style.RESET_ALL}",
         f"{Fore.CYAN}║{Fore.WHITE}{'─' * content_width}{Fore.CYAN}║{Style.RESET_ALL}",
-        f"{Fore.CYAN}║{Fore.WHITE} Question:{Fore.GREEN} {question}{' ' * (content_width - len(f'Question: {question}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}",
-        f"{Fore.CYAN}║{Fore.WHITE} Answer:{Fore.YELLOW} {answer}{' ' * (content_width - len(f'Answer: {answer}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}",
-        f"{Fore.CYAN}║{Fore.WHITE} Topic:{Fore.MAGENTA} {topic}{' ' * (content_width - len(f'Topic: {topic}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}",
+        format_line("Question", question, Fore.GREEN),
+        format_line("Answer", answer, Fore.YELLOW),
+        format_line("Topic", topic, Fore.MAGENTA),
         f"{Fore.CYAN}╚{'═' * content_width}╝{Style.RESET_ALL}"
     ]
     return '\n'.join(box)
@@ -27,71 +32,63 @@ class Flashcard:
         self.answer = answer
         self.topic = topic
 
-
 class FlashcardQuiz:
-
     def __init__(self):
         self.flashcards = []
         self.history_stack = []
-
 
     def add_flashcard(self, question, answer, topic):
         self.flashcards.append(Flashcard(question, answer, topic))
         print("Flashcard added!")
 
-
     def remove_flashcard(self, index):
+        if not self.flashcards:
+            print("No flashcards available to remove.")
+            return None
+
         if 0 <= index < len(self.flashcards):
             removed_card = self.flashcards.pop(index)
             print(f"Removed flashcard: Question: {removed_card.question} | Topic: {removed_card.topic}")
         else:
             print("Invalid index. Please try again.")
 
-
     def view_flashcards(self):
         if not self.flashcards:
             print("No flashcards available.")
             return
+
         print("\nCurrent Flashcards:")
         for i, flashcard in enumerate(self.flashcards, 1):
+            print(f"{i}. Topic: {flashcard.topic}")
             print(create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
-            print()
+        print()
 
+    def save_flashcards(self, filename):
+        with open(filename, 'w') as file:
+            json.dump([flashcard.__dict__ for flashcard in self.flashcards], file)
+        print(f"Flashcards saved to {filename}")
 
-    def get_topics(self):
-        return set(flashcard.topic for flashcard in self.flashcards)
-
+    def load_flashcards(self, filename):
+        try:
+            with open(filename, 'r') as file:
+                flashcards_data = json.load(file)
+                self.flashcards = [Flashcard(**data) for data in flashcards_data]
+            print(f"Flashcards loaded from {filename}")
+        except FileNotFoundError:
+            print(f"No such file: {filename}")
 
     def start_quiz(self):
         if not self.flashcards:
             print("No flashcards available. Add some flashcards to start the quiz!")
-            return
+            return None
 
-        topics = self.get_topics()
-        print("\nAvailable Topics:")
-        for topic in topics:
-            print(f"- {topic}")
-        print("- All (to include all topics)")
-
-        selected_topic = input("\nEnter a topic to quiz on (or type 'All' for all topics): ").strip()
-        if selected_topic.lower() != "all":
-            selected_flashcards = [fc for fc in self.flashcards if fc.topic.lower() == selected_topic.lower()]
-            if not selected_flashcards:
-                print(f"No flashcards found for the topic '{selected_topic}'.")
-                return
-        else:
-            selected_flashcards = self.flashcards
-
-        # Ask if the user wants to shuffle the selected flashcards
-        shuffle_choice = input("Do you want to shuffle the flashcards? (yes/no): ").strip().lower()
-        if shuffle_choice == "yes":
-            random.shuffle(selected_flashcards)
-            print("Flashcards shuffled!")
+        random.shuffle(self.flashcards)
+        print("Flashcards shuffled!")
 
         self.history_stack = []  # Reset the history stack
         score = 0  # Initialize score
 
-        for flashcard in selected_flashcards:
+        for flashcard in self.flashcards:
             print(f"\nQuestion: {flashcard.question}")
             user_answer = input("Your Answer: ").strip()
             if user_answer.lower() == flashcard.answer.lower():
@@ -101,18 +98,24 @@ class FlashcardQuiz:
                 print(f"Incorrect. The correct answer is: {flashcard.answer}")
             self.history_stack.append(flashcard)  # Push flashcard onto the stack
 
-        print(f"\nQuiz completed! Your score: {score}/{len(selected_flashcards)}")
-
+        print(f"\nQuiz completed! Your score: {score}/{len(self.flashcards)}")
 
     def review_history(self):
         if not self.history_stack:
             print("No quiz history to review.")
-            return
+            return None
         print("\nFlashcard History (Last to First):")
         for i, flashcard in enumerate(reversed(self.history_stack), 1):
             print(create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
             print()
 
+    def clear_quiz_history(self):
+        confirm = input("Are you sure you want to clear the quiz history? (yes/no): ").strip().lower()
+        if confirm == 'yes':
+            self.history_stack.clear()
+            print("Quiz history cleared.")
+        else:
+            print("Operation cancelled.")
 
 quiz = FlashcardQuiz()
 
@@ -123,30 +126,54 @@ while True:
     print("3. View flashcards")
     print("4. Start quiz")
     print("5. Review quiz history")
-    print("6. Exit")
+    print("6. Save flashcards")
+    print("7. Load flashcards")
+    print("8. Clear quiz history")
+    print("9. Exit")
 
-    choice = input("Choose an option (1-6): ")
+    choice = int(input("Choose an option (1-9): "))
 
-    if choice == "1":
-        question = input("Enter the question: ")
-        answer = input("Enter the answer: ")
-        topic = input("Enter the topic: ")
-        quiz.add_flashcard(question, answer, topic)
-    elif choice == "2":
-        quiz.view_flashcards()
-        try:
-            index = int(input("Enter the index of the flashcard to remove (1-based): ")) - 1
-            quiz.remove_flashcard(index)
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-    elif choice == "3":
-        quiz.view_flashcards()
-    elif choice == "4":
-        quiz.start_quiz()
-    elif choice == "5":
-        quiz.review_history()
-    elif choice == "6":
-        print("Exiting the app.")
-        break
-    else:
-        print("Invalid choice. Please select a valid option.")
+    match choice:
+        case 1:
+            question = input("Enter the question: ")
+            answer = input("Enter the answer: ")
+            topic = input("Enter the topic: ")
+            quiz.add_flashcard(question, answer, topic)
+
+        case 2:
+            if not quiz.flashcards:
+                print("No flashcards available to remove.")
+            else:
+                quiz.view_flashcards()
+                try:
+                    index = int(input("Enter the index of the flashcard to remove (1-based): ")) - 1
+                    quiz.remove_flashcard(index)
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+
+        case 3:
+            quiz.view_flashcards()
+
+        case 4:
+            quiz.start_quiz()
+
+        case 5:
+            quiz.review_history()
+
+        case 6:
+            filename = input("Enter the filename to save flashcards: ")
+            quiz.save_flashcards(filename)
+
+        case 7:
+            filename = input("Enter the filename to load flashcards: ")
+            quiz.load_flashcards(filename)
+
+        case 8:
+            quiz.clear_quiz_history()
+
+        case 9:
+            print("Exiting the app.")
+            break
+
+        case _:
+            print("Invalid choice. Please select a valid option.")
