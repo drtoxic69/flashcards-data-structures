@@ -1,5 +1,25 @@
 import random
+from colorama import init, Fore, Style
+init()
 
+def create_box(question, answer, topic, index):
+    # Calculate the width based on the longest content
+    content_width = max(
+        len(f"Question: {question}"),
+        len(f"Answer: {answer}"),
+        len(f"Topic: {topic}")
+    ) + 4  # Add some padding
+
+    box = [
+        f"{Fore.CYAN}╔{'═' * content_width}╗{Style.RESET_ALL}",
+        f"{Fore.CYAN}║{Fore.WHITE}{f' #{index}'.center(content_width)}{Fore.CYAN}║{Style.RESET_ALL}",
+        f"{Fore.CYAN}║{Fore.WHITE}{'─' * content_width}{Fore.CYAN}║{Style.RESET_ALL}",
+        f"{Fore.CYAN}║{Fore.WHITE} Question:{Fore.GREEN} {question}{' ' * (content_width - len(f'Question: {question}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}",
+        f"{Fore.CYAN}║{Fore.WHITE} Answer:{Fore.YELLOW} {answer}{' ' * (content_width - len(f'Answer: {answer}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}",
+        f"{Fore.CYAN}║{Fore.WHITE} Topic:{Fore.MAGENTA} {topic}{' ' * (content_width - len(f'Topic: {topic}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}",
+        f"{Fore.CYAN}╚{'═' * content_width}╝{Style.RESET_ALL}"
+    ]
+    return '\n'.join(box)
 
 class Flashcard:
     def __init__(self, question, answer, topic):
@@ -34,8 +54,8 @@ class FlashcardQuiz:
             return
         print("\nCurrent Flashcards:")
         for i, flashcard in enumerate(self.flashcards, 1):
-            print(f"{i}. Question: {flashcard.question} | Answer: {flashcard.answer} | Topic: {flashcard.topic}")
-        print()
+            print(create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
+            print()
 
 
     def get_topics(self):
@@ -90,8 +110,8 @@ class FlashcardQuiz:
             return
         print("\nFlashcard History (Last to First):")
         for i, flashcard in enumerate(reversed(self.history_stack), 1):
-            print(f"{i}. Question: {flashcard.question} | Answer: {flashcard.answer} | Topic: {flashcard.topic}")
-        print()
+            print(create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
+            print()
 
 
 quiz = FlashcardQuiz()
