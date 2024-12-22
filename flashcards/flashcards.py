@@ -2,35 +2,16 @@ import random
 import json
 from colorama import init, Fore, Style
 
+
+# coloroma initilization
 init()
-
-def create_box(question, answer, topic, index):
-    # Calculate the width based on the longest content
-    content_width = max(
-        len(f"Question: {question}"),
-        len(f"Answer: {answer}"),
-        len(f"Topic: {topic}")
-    ) + 4  # Add some padding
-
-    def format_line(label, content, color):
-        return f"{Fore.CYAN}║{Fore.WHITE} {label}:{color} {content}{' ' * (content_width - len(f'{label}: {content}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}"
-
-    box = [
-        f"{Fore.CYAN}╔{'═' * content_width}╗{Style.RESET_ALL}",
-        f"{Fore.CYAN}║{Fore.WHITE}{f' #{index}'.center(content_width)}{Fore.CYAN}║{Style.RESET_ALL}",
-        f"{Fore.CYAN}║{Fore.WHITE}{'─' * content_width}{Fore.CYAN}║{Style.RESET_ALL}",
-        format_line("Question", question, Fore.GREEN),
-        format_line("Answer", answer, Fore.YELLOW),
-        format_line("Topic", topic, Fore.MAGENTA),
-        f"{Fore.CYAN}╚{'═' * content_width}╝{Style.RESET_ALL}"
-    ]
-    return '\n'.join(box)
 
 class Flashcard:
     def __init__(self, question, answer, topic):
         self.question = question
         self.answer = answer
         self.topic = topic
+
 
 class FlashcardQuiz:
     def __init__(self):
@@ -52,15 +33,38 @@ class FlashcardQuiz:
         else:
             print("Invalid index. Please try again.")
 
+    def create_box(self, question, answer, topic, index, result_symbol=None, result_color=None):
+        content_width = max(
+            len(f"Question: {question}"),
+            len(f"Answer: {answer}"),
+            len(f"Topic: {topic}")
+        ) + 4  # padding
+
+        def format_line(label, content, color):
+            return f"{Fore.CYAN}║{Fore.WHITE} {label}:{color} {content}{' ' * (content_width - len(f'{label}: {content}') - 1)}{Fore.CYAN}║{Style.RESET_ALL}"
+
+        symbol_str = f" {result_color}{result_symbol}{Style.RESET_ALL}" if result_symbol else ""
+
+        box = [
+            f"{Fore.CYAN}╔{'═' * content_width}╗{symbol_str}{Style.RESET_ALL}",
+            f"{Fore.CYAN}║{Fore.WHITE}{f' #{index}'.center(content_width)}{Fore.CYAN}║{Style.RESET_ALL}",
+            f"{Fore.CYAN}║{Fore.WHITE}{'─' * content_width}{Fore.CYAN}║{Style.RESET_ALL}",
+            format_line("Question", question, Fore.GREEN),
+            format_line("Answer", answer, Fore.YELLOW),
+            format_line("Topic", topic, Fore.MAGENTA),
+            f"{Fore.CYAN}╚{'═' * content_width}╝{Style.RESET_ALL}"
+        ]
+        return '\n'.join(box)
+
     def view_flashcards(self):
         if not self.flashcards:
             print("No flashcards available.")
-            return
+            return None
 
         print("\nCurrent Flashcards:")
         for i, flashcard in enumerate(self.flashcards, 1):
             print(f"{i}. Topic: {flashcard.topic}")
-            print(create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
+            print(self.create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
         print()
 
     def save_flashcards(self, filename):
@@ -82,32 +86,86 @@ class FlashcardQuiz:
             print("No flashcards available. Add some flashcards to start the quiz!")
             return None
 
-        random.shuffle(self.flashcards)
-        print("Flashcards shuffled!")
+        # Get and display available topics
+        available_topics = sorted(set(card.topic for card in self.flashcards))
+        print("\nAvailable Topics:")
+        print("Press Enter for all topics")
+        for i, topic in enumerate(available_topics, 1):
+            print(f"{i}. {topic}")
 
-        self.history_stack = []  # Reset the history stack
-        score = 0  # Initialize score
+        # Get topic selection from user
+        while True:
+            try:
+                choice = input("\nSelect topic number (or press Enter for all topics): ").strip()
+                if not choice:  # Handle empty input (Enter key)
+                    selected_topic = None
+                    break
 
-        for flashcard in self.flashcards:
-            print(f"\nQuestion: {flashcard.question}")
+                choice = int(choice)
+                if 1 <= choice <= len(available_topics):
+                    selected_topic = available_topics[choice - 1]
+                    break
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a valid number.")
+
+        if selected_topic:
+            quiz_cards = [card for card in self.flashcards if card.topic.lower() == selected_topic.lower()]
+            print(f"\nStarting quiz for topic: {selected_topic}")
+        else:
+            quiz_cards = self.flashcards.copy()
+            print("\nStarting quiz for all topics")
+
+        random.shuffle(quiz_cards)
+        print(f"Number of questions: {len(quiz_cards)}")
+
+        quiz_results = []
+        score = 0
+
+        for i, flashcard in enumerate(quiz_cards, 1):
+            print(f"\nQuestion {i}/{len(quiz_cards)}")
+            print(f"Topic: {flashcard.topic}")
+            print(f"Question: {flashcard.question}")
             user_answer = input("Your Answer: ").strip()
-            if user_answer.lower() == flashcard.answer.lower():
-                print("Correct!")
+            is_correct = user_answer.lower() == flashcard.answer.lower()
+            if is_correct:
+                print(f"{Fore.GREEN}Correct!{Style.RESET_ALL}")
                 score += 1
             else:
-                print(f"Incorrect. The correct answer is: {flashcard.answer}")
-            self.history_stack.append(flashcard)  # Push flashcard onto the stack
+                print(f"{Fore.RED}Incorrect. The correct answer is: {flashcard.answer}{Style.RESET_ALL}")
+            quiz_results.append((flashcard, is_correct))
 
-        print(f"\nQuiz completed! Your score: {score}/{len(self.flashcards)}")
+        self.history_stack.append({
+            'score': score,
+            'total': len(quiz_cards),
+            'results': quiz_results
+        })
+
+        percentage = (score / len(quiz_cards)) * 100
+        print("\nQuiz completed!")
+        print(f"Your score: {score}/{len(quiz_cards)} ({percentage:.1f}%)")
 
     def review_history(self):
         if not self.history_stack:
             print("No quiz history to review.")
             return None
-        print("\nFlashcard History (Last to First):")
-        for i, flashcard in enumerate(reversed(self.history_stack), 1):
-            print(create_box(flashcard.question, flashcard.answer, flashcard.topic, i))
-            print()
+
+        print("\nFlashcard History (Most Recent First):")
+        for quiz_num, quiz_session in enumerate(reversed(self.history_stack), 1):
+            score = quiz_session['score']
+            total = quiz_session['total']
+            percentage = (score / total) * 100
+
+            print(f"\n{Fore.CYAN}═══ Quiz #{quiz_num} ═══{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Score: {score}/{total} ({percentage:.1f}%){Style.RESET_ALL}")
+            print(f"{Fore.WHITE}Flashcards from this quiz:{Style.RESET_ALL}\n")
+
+            for i, (flashcard, is_correct) in enumerate(quiz_session['results'], 1):
+                result_color = Fore.GREEN if is_correct else Fore.RED
+                result_symbol = "✓" if is_correct else "✗"
+                print(self.create_box(flashcard.question, flashcard.answer, flashcard.topic, i, result_symbol, result_color))
+                print()
 
     def clear_quiz_history(self):
         confirm = input("Are you sure you want to clear the quiz history? (yes/no): ").strip().lower()
