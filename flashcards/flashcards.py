@@ -220,11 +220,11 @@ while True:
 
         case 6:
             filename = input("Enter the filename to save flashcards: ")
-            quiz.save_flashcards(filename)
+            quiz.save_flashcards("out/" + filename + ".json")
 
         case 7:
             filename = input("Enter the filename to load flashcards: ")
-            quiz.load_flashcards(filename)
+            quiz.load_flashcards("out/" + filename + ".json")
 
         case 8:
             quiz.clear_quiz_history()
